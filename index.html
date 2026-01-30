@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>お絵描きアプリ Ver.5</title>
+    <title>お絵描きアプリ Ver.6</title>
     <style>
         body {
             font-family: sans-serif;
@@ -38,19 +38,25 @@
             justify-content: center;
         }
 
-        /* キャンバスの設定 */
+        /* --- キャンバスとカーソルの設定 --- */
         canvas {
             background-color: white;
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
             border-radius: 4px;
-            cursor: crosshair;
             max-width: 100%;
             height: auto;
-            /* 背景画像がはみ出ないように */
             display: block;
+            
+            /* ▼ デフォルト：ペンのカーソル（ペン先が基準） */
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><path fill="black" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>') 0 24, crosshair;
         }
 
-        /* ボタン共通スタイル */
+        /* ▼ 消しゴムモード：丸いカーソル（中心が基準） */
+        canvas.eraser-mode {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="32" width="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="14" stroke="black" stroke-width="2" fill="white" opacity="0.8"/></svg>') 16 16, crosshair;
+        }
+
+        /* --- ボタンやUIのスタイル --- */
         button {
             border: none;
             padding: 8px 12px;
@@ -68,18 +74,13 @@
         button:hover { background-color: #ddd; }
         button:active { transform: scale(0.95); }
 
-        /* アクティブなツール */
         button.active {
             background-color: #4dabf7;
             color: white;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
 
-        /* カラーパレット */
-        .palette {
-            display: flex;
-            gap: 8px;
-        }
+        .palette { display: flex; gap: 8px; }
         .color-swatch {
             width: 30px;
             height: 30px;
@@ -92,24 +93,20 @@
         .color-swatch:hover { transform: scale(1.1); }
         .color-swatch.selected { border: 2px solid #333; transform: scale(1.1); }
 
-        /* 特別なボタンの色 */
         #clearBtn { background-color: #ff8787; color: white; }
         #saveBtn { background-color: #69db7c; color: white; }
         #undoBtn { background-color: #ffc078; color: white; }
 
-        /* レンジ入力 */
         input[type="range"] { width: 100px; cursor: pointer; }
-        
-        /* ファイル入力は隠してボタンで操作 */
         #fileInput { display: none; }
     </style>
 </head>
 <body>
 
-    <h1>お絵描きアプリ Ver.5</h1>
+    <h1>お絵描きアプリ Ver.6</h1>
 
     <div class="controls-container">
-        <!-- 1行目：ツールと操作 -->
+        <!-- ツール類 -->
         <div class="row">
             <button id="undoBtn" title="ひとつ戻る">↩️ 戻る</button>
             <button id="penBtn" class="active">✏️ ペン</button>
@@ -117,19 +114,16 @@
             <button id="clearBtn">🗑️ 全消去</button>
         </div>
 
-        <!-- 2行目：カラーパレット -->
-        <div class="row palette" id="palette">
-            <!-- JavaScriptでここに色ボタンを追加します -->
-        </div>
+        <!-- カラーパレット -->
+        <div class="row palette" id="palette"></div>
 
-        <!-- 3行目：設定とファイル -->
+        <!-- 設定・ファイル -->
         <div class="row">
             <label>太さ: <input type="range" id="lineWidth" min="1" max="50" value="5"></label>
             <label>カスタム色: <input type="color" id="colorPicker" value="#000000"></label>
             
             <button id="loadBtn" onclick="document.getElementById('fileInput').click()">🖼️ 画像読込</button>
             <input type="file" id="fileInput" accept="image/*">
-            
             <button id="saveBtn">💾 保存</button>
         </div>
     </div>
@@ -142,7 +136,6 @@
         const colorPicker = document.getElementById('colorPicker');
         const lineWidthRange = document.getElementById('lineWidth');
         
-        // 状態管理
         let isDrawing = false;
         let lastX = 0;
         let lastY = 0;
@@ -151,19 +144,17 @@
         let eraserWidth = 30;
         let savedColor = '#000000';
         
-        // 履歴管理（Undo用）
+        // Undo履歴
         let drawHistory = [];
-        const MAX_HISTORY = 10; // 戻れる回数
+        const MAX_HISTORY = 10;
 
-        // 初期設定
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
         ctx.lineWidth = penWidth;
 
-        // --- 1. カラーパレットの生成 ---
+        // パレット生成
         const colors = ['#000000', '#FF0000', '#0000FF', '#008000', '#FFFF00', '#FFA500', '#FFC0CB', '#800080', '#A52A2A', '#808080'];
         const paletteContainer = document.getElementById('palette');
-
         colors.forEach(color => {
             const swatch = document.createElement('div');
             swatch.className = 'color-swatch';
@@ -174,13 +165,12 @@
 
         function changeColor(color) {
             savedColor = color;
-            colorPicker.value = color; // ピッカーの見た目も合わせる
+            colorPicker.value = color;
             switchTool('pen');
             updatePaletteUI(color);
         }
 
         function updatePaletteUI(activeColor) {
-            // パレットの枠線を更新
             const swatches = document.querySelectorAll('.color-swatch');
             swatches.forEach(s => {
                 if (rgbToHex(s.style.backgroundColor) === activeColor.toLowerCase()) {
@@ -191,19 +181,14 @@
             });
         }
         
-        // カラーコード変換用ヘルパー
         function rgbToHex(rgb) {
             if (rgb.startsWith('#')) return rgb.toLowerCase();
             const rgbValues = rgb.match(/\d+/g);
             return "#" + ((1 << 24) + (parseInt(rgbValues[0]) << 16) + (parseInt(rgbValues[1]) << 8) + parseInt(rgbValues[2])).toString(16).slice(1).toLowerCase();
         }
 
-        // --- 2. 履歴保存 (Undo機能) ---
         function saveState() {
-            // 描く前の状態を保存
-            if (drawHistory.length >= MAX_HISTORY) {
-                drawHistory.shift(); // 古い履歴を削除
-            }
+            if (drawHistory.length >= MAX_HISTORY) drawHistory.shift();
             drawHistory.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
         }
 
@@ -211,12 +196,9 @@
             if (drawHistory.length > 0) {
                 const lastState = drawHistory.pop();
                 ctx.putImageData(lastState, 0, 0);
-            } else {
-                alert('これ以上戻れません');
             }
         });
 
-        // --- 3. 画像保存機能 ---
         document.getElementById('saveBtn').addEventListener('click', () => {
             const link = document.createElement('a');
             link.download = 'my-drawing.png';
@@ -224,24 +206,17 @@
             link.click();
         });
 
-        // --- 4. 背景画像読み込み ---
         document.getElementById('fileInput').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
-
             const reader = new FileReader();
             reader.onload = (event) => {
                 const img = new Image();
                 img.onload = () => {
-                    // キャンバスサイズを画像に合わせる（ただし画面幅を超えないように調整も可能だが、今回は単純にリサイズ）
-                    // 履歴が消えるので現在の状態を保存したい場合はここで処理が必要ですが、
-                    // 画像読み込みは「新しいキャンバス」として扱うためリセットします。
-                    if(confirm("新しい画像を読み込みますか？（今の絵は消えます）")){
+                    if(confirm("画像を読み込みますか？（今の絵は消えます）")){
                         canvas.width = img.width;
                         canvas.height = img.height;
                         ctx.drawImage(img, 0, 0);
-                        
-                        // キャンバスサイズが変わるとコンテキストがリセットされるので再設定
                         ctx.lineJoin = 'round';
                         ctx.lineCap = 'round';
                         if (currentMode === 'pen') {
@@ -251,17 +226,16 @@
                             ctx.strokeStyle = '#ffffff';
                             ctx.lineWidth = eraserWidth;
                         }
-                        
-                        drawHistory = []; // 履歴リセット
+                        drawHistory = [];
                     }
                 };
                 img.src = event.target.result;
             };
             reader.readAsDataURL(file);
-            e.target.value = ''; // 同じファイルを再度選べるようにリセット
+            e.target.value = '';
         });
 
-        // --- 基本の描画ツール処理 ---
+        // ツール切り替え（カーソル変更処理も含む）
         function switchTool(mode) {
             currentMode = mode;
             const penBtn = document.getElementById('penBtn');
@@ -271,6 +245,10 @@
                 ctx.strokeStyle = savedColor;
                 ctx.lineWidth = penWidth;
                 lineWidthRange.value = penWidth;
+                
+                // カーソルをペンに戻す
+                canvas.classList.remove('eraser-mode');
+                
                 penBtn.classList.add('active');
                 eraserBtn.classList.remove('active');
             } else if (mode === 'eraser') {
@@ -278,6 +256,10 @@
                 ctx.strokeStyle = '#ffffff';
                 ctx.lineWidth = eraserWidth;
                 lineWidthRange.value = eraserWidth;
+                
+                // カーソルを消しゴム（丸）にする
+                canvas.classList.add('eraser-mode');
+                
                 penBtn.classList.remove('active');
                 eraserBtn.classList.add('active');
             }
@@ -299,15 +281,14 @@
 
         document.getElementById('clearBtn').addEventListener('click', () => {
             if(confirm('本当に全部消しますか？')) {
-                saveState(); // 消す前にも保存しておく（Undoできるように）
+                saveState();
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
             }
         });
 
-        // --- 描画イベント ---
         function startDrawing(e) {
             isDrawing = true;
-            saveState(); // ★描き始める瞬間に現在の状態を保存
+            saveState();
             [lastX, lastY] = getCoordinates(e);
         }
 
@@ -347,9 +328,7 @@
         canvas.addEventListener('touchmove', draw);
         canvas.addEventListener('touchend', stopDrawing);
 
-        // 初期化実行
         updatePaletteUI(savedColor);
-
     </script>
 </body>
 </html>

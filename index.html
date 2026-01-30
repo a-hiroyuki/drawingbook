@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>お絵描きアプリ Ver.4</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+            touch-action: none;
+        }
+
+        h1 { margin-bottom: 10px; font-size: 1.5rem; color: #333; }
+
+        .controls {
+            background: white;
+            padding: 10px 20px;
+            border-radius: 50px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            max-width: 95%;
+        }
+
+        canvas {
+            background-color: white;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><path fill="black" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>') 0 24, auto;
+            max-width: 100%;
+            height: auto;
+        }
+
+        canvas.eraser-mode {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" height="32" width="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="14" stroke="black" stroke-width="2" fill="white" opacity="0.8"/></svg>') 16 16, auto;
+        }
+
+        button {
+            background-color: #ddd;
+            color: #333;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        button:hover { background-color: #ccc; }
+        
+        button.active {
+            background-color: #4dabf7;
+            color: white;
+            transform: scale(1.05);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        /* 全消去ボタンのスタイル */
+        #clearBtn {
+            background-color: #ff6b6b;
+            color: white;
+            margin-left: auto; /* 右寄せにする */
+        }
+        #clearBtn:hover { background-color: #fa5252; }
+
+        .tool-group { display: flex; gap: 10px; }
+        input[type="range"] { cursor: pointer; width: 100px; }
+    </style>
+</head>
+<body>
+
+    <h1>お絵描きアプリ Ver.4</h1>
+
+    <div class="controls">
+        <div class="tool-group">
+            <button id="penBtn" class="active">✏️ ペン</button>
+            <button id="eraserBtn">🧹 消しゴム</button>
+        </div>
+
+        <label>色: <input type="color" id="colorPicker" value="#000000"></label>
+        <label>太さ: <input type="range" id="lineWidth" min="1" max="100" value="5"></label>
+        
+        <!-- ここに全消去ボタンがあります -->
+        <button id="clearBtn">🗑️ 全消去</button>
+    </div>
+
+    <canvas id="myCanvas" width="800" height="600"></canvas>
+
+    <script>
+        const canvas = document.getElementById('myCanvas');
+        const ctx = canvas.getContext('2d');
+        const colorPicker = document.getElementById('colorPicker');
+        const lineWidthRange = document.getElementById('lineWidth');
+        const clearBtn = document.getElementById('clearBtn');
+        const penBtn = document.getElementById('penBtn');
+        const eraserBtn = document.getElementById('eraserBtn');
+
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        
+        let currentMode = 'pen';
+        let penWidth = 5;
+        let eraserWidth = 30; 
+        let savedColor = '#000000';
+
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.lineWidth = penWidth;
+
+        function switchTool(mode) {
+            currentMode = mode;
+            if (mode === 'pen') {
+                ctx.strokeStyle = savedColor;
+                ctx.lineWidth = penWidth;
+                lineWidthRange.value = penWidth;
+                canvas.classList.remove('eraser-mode');
+                penBtn.classList.add('active');
+                eraserBtn.classList.remove('active');
+            } else if (mode === 'eraser') {
+                savedColor = colorPicker.value;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = eraserWidth;
+                lineWidthRange.value = eraserWidth;
+                canvas.classList.add('eraser-mode');
+                penBtn.classList.remove('active');
+                eraserBtn.classList.add('active');
+            }
+        }
+
+        penBtn.addEventListener('click', () => switchTool('pen'));
+        eraserBtn.addEventListener('click', () => switchTool('eraser'));
+
+        lineWidthRange.addEventListener('input', (e) => {
+            const width = e.target.value;
+            ctx.lineWidth = width;
+            if (currentMode === 'pen') {
+                penWidth = width;
+            } else {
+                eraserWidth = width;
+            }
+        });
+
+        colorPicker.addEventListener('input', (e) => {
+            savedColor = e.target.value;
+            if (currentMode === 'eraser') switchTool('pen');
+            else ctx.strokeStyle = savedColor;
+        });
+
+        // 全消去機能
+        clearBtn.addEventListener('click', () => {
+            if(confirm('描いた絵を全部消しますか？')) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        });
+
+        function startDrawing(e) {
+            isDrawing = true;
+            [lastX, lastY] = getCoordinates(e);
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            const [currentX, currentY] = getCoordinates(e);
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(currentX, currentY);
+            ctx.stroke();
+            [lastX, lastY] = [currentX, currentY];
+        }
+
+        function stopDrawing() { isDrawing = false; }
+
+        function getCoordinates(e) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX, clientY;
+            if (e.type.includes('touch')) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return [(clientX - rect.left) * scaleX, (clientY - rect.top) * scaleY];
+        }
+
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+        canvas.addEventListener('touchstart', startDrawing);
+        canvas.addEventListener('touchmove', draw);
+        canvas.addEventListener('touchend', stopDrawing);
+    </script>
+</body>
+</html>
